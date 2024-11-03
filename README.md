@@ -139,7 +139,7 @@ multi_lstm_model = tf.keras.Sequential([
 
 ## Results
 The results show that the model was successful in predicting the mean temperature one week into the future!
-![Alt text](images/FinalPredictions.PNG "Graph showing the predictions of mean temp agaisnt expected values.")
+![Alt text](images/FINALFINALpredictions.png "Graph showing the predictions of mean temp agaisnt expected values.")
 
 
 ## References
