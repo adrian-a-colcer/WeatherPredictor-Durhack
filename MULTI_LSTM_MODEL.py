@@ -8,12 +8,14 @@ os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 filename = "Durham-Observatory-daily-climatological-dataset.xlsx"
 df = pd.read_excel(filename,sheet_name = "Durham Obsy - daily data 1843-")
-df.drop(df[df["YYYY"] < 1950].index, inplace=True)
-df.drop(df.columns[14:], axis = 1, inplace=True)
+
 dates = pd.to_datetime(dict(year=df["YYYY"], month=df["MM"], day=df["DD"]))
 day_of_year = dates.dt.dayofyear
-df.drop(columns = ["Date","DD","MM","YYYY"],inplace = True)
+
+df = df.loc[df["YYYY"] >= 1950, 'Tmax °C':'Wet day']
 df.dropna(inplace=True)
+
+#forming periodicity in day values
 
 df["Year sin"] = np.sin(day_of_year * (2 * np.pi / 365))
 df["Year cos"] = np.cos(day_of_year * (2 * np.pi / 365))
@@ -33,6 +35,7 @@ class GenWindow():
         self.input_width = input_width
         self.label_width = label_width
         self.shift = shift
+
         self.train_df = train_df
         self.valid_df = valid_df
         self.test_df = test_df
@@ -115,17 +118,17 @@ class GenWindow():
         return result
     
 
-#predicting 1 weeks into the future
-OUTPUT_STEPS = 7
+OUTPUT_STEPS = 21
 multistep_window = GenWindow(input_width=21,label_width=OUTPUT_STEPS,shift=OUTPUT_STEPS)
 
 multi_lstm_model = tf.keras.Sequential([
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.LSTM(252, return_sequences=False),
+
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Dropout(rate = 0.2),
-
     tf.keras.layers.Dense(252),
+
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Dropout(rate = 0.3),
     tf.keras.layers.Dense(OUTPUT_STEPS*n_features,
@@ -135,9 +138,8 @@ multi_lstm_model = tf.keras.Sequential([
 ])
 
 #TRAINING
-
 early_stopping = tf.keras.callbacks.EarlyStopping(monitor = "val_loss",
-                                                  patience = 5,
+                                                  patience = 10,
                                                   verbose = 1)
 
 callback_reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss',
@@ -150,9 +152,9 @@ multi_lstm_model.compile(loss = tf.losses.MeanSquaredError(),
                        optimizer = tf.keras.optimizers.RMSprop(),
                        metrics = [tf.keras.metrics.MeanAbsoluteError()])
 
-history = multi_lstm_model.fit(multistep_window.train, epochs = 200,
+history = multi_lstm_model.fit(multistep_window.train, epochs = 50,
                     validation_data = multistep_window.valid,
-                    callbacks = [callback_reduce_lr])
+                    callbacks = [callback_reduce_lr,early_stopping])
 
 multistep_window.plot(multi_lstm_model)
 plt.show()
